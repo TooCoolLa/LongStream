@@ -8,9 +8,9 @@
 </p>
 
 <p align="center">
-  <a href="examples/teaser.mp4">
-    <img src="examples/teaser.gif" alt="LongStream teaser" width="960">
-  </a>
+  <video src="examples/teaser.mp4" controls playsinline muted preload="metadata" width="960">
+    Your browser does not support the video tag. Download <a href="examples/teaser.mp4">examples/teaser.mp4</a>.
+  </video>
 </p>
 
 ## Abstract
@@ -44,7 +44,6 @@ Notes:
 
 - `ffmpeg` is required for RGB and depth video export.
 - Please follow the official [PyTorch installation guide](https://pytorch.org/get-started/locally/) to install Torch and CUDA versions compatible with your hardware and drivers.
-- Sky masking is enabled by default in the release config. It requires `onnxruntime` and may auto-download `skyseg.onnx` on first use; for offline runs or to silence this fallback path, use `--no-mask-sky`.
 
 ## Dataset Format and Conventions
 
@@ -133,8 +132,6 @@ You can use it in either of these ways:
 
 - Place `50_longstream.pt` at `checkpoints/50_longstream.pt`.
 - Or run directly from Hugging Face:
-
-  When `--hf-repo` or `--hf-file` is provided on the CLI, it overrides the checkpoint path inherited from `configs/longstream_infer.yaml` unless `--checkpoint` is also passed explicitly.
 
 ```bash
 python run.py \
