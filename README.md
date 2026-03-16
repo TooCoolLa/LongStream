@@ -290,11 +290,14 @@ When evaluation is run, metrics are saved to:
 ## Citation
 
 ```bibtex
-@article{cheng2026longstream,
-  title={LongStream: Long-Sequence Streaming Autoregressive Visual Geometry},
-  author={Chong Cheng and Xianda Chen and Tao Xie and Wei Yin and Weiqiang Ren and Qian Zhang and Xiaoyuang Guo and Hao Wang},
-  journal={arXiv preprint arXiv:2602.13172},
-  year={2026}
+@misc{cheng2026longstreamlongsequencestreamingautoregressive,
+      title={LongStream: Long-Sequence Streaming Autoregressive Visual Geometry}, 
+      author={Chong Cheng and Xianda Chen and Tao Xie and Wei Yin and Weiqiang Ren and Qian Zhang and Xiaoyang Guo and Hao Wang},
+      year={2026},
+      eprint={2602.13172},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2602.13172}, 
 }
 ```
 
