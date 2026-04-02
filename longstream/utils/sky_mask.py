@@ -107,7 +107,11 @@ def compute_sky_mask(image_paths, model_path: str, target_dir: str = None):
         )
         return None
     try:
-        session = onnxruntime.InferenceSession(model_path)
+        providers = [
+            ("CUDAExecutionProvider", {"device_id": 0}),
+            "CPUExecutionProvider",
+        ]
+        session = onnxruntime.InferenceSession(model_path, providers=providers)
     except Exception as exc:
         _warn_once(f"[longstream] failed to load skyseg.onnx: {exc}")
         _warn_once(

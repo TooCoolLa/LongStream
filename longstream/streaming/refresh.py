@@ -1,4 +1,5 @@
 import torch
+from tqdm import tqdm
 from typing import Dict, Any, List
 
 from longstream.streaming.stream_session import StreamSession
@@ -87,10 +88,19 @@ def run_batch_refresh(
     frames_per_batch = refresh_intervals * keyframe_stride + 1
     step_frames = refresh_intervals * keyframe_stride
 
+    print(
+        f"[inference] batch_refresh: {S} frames, "
+        f"{frames_per_batch} frames/batch, "
+        f"step={step_frames} frames",
+        flush=True,
+    )
+
     stitched_tensors: Dict[str, List[torch.Tensor]] = {}
     stitched_scalars: Dict[str, Any] = {}
     num_batches = (S + step_frames - 1) // step_frames
-    for batch_idx in range(num_batches):
+    for batch_idx in tqdm(
+        range(num_batches), desc="Batch inference", unit="batch", leave=True
+    ):
         start_frame = batch_idx * step_frames
         end_frame = min(start_frame + frames_per_batch, S)
         batch_images = images[:, start_frame:end_frame].to(device, non_blocking=True)
@@ -150,6 +160,7 @@ def run_batch_refresh(
         del batch_is_keyframe
         del batch_keyframe_indices
 
+    print(f"[inference] batch_refresh: {num_batches} batches done", flush=True)
     return _finalize_stitched_batches(stitched_tensors, stitched_scalars)
 
 
@@ -169,7 +180,14 @@ def run_streaming_refresh(
     session = StreamSession(model, mode=mode, window_size=window_size)
     keyframe_count = 0
     segment_start = 0
-    for s in range(S):
+
+    print(
+        f"[inference] streaming_refresh: {S} frames, "
+        f"refresh every {refresh_intervals} keyframes",
+        flush=True,
+    )
+
+    for s in tqdm(range(S), desc="Streaming inference", unit="frame", leave=True):
         frame_images = images[:, s : s + 1].to(device, non_blocking=True)
         is_keyframe_s = (
             is_keyframe[:, s : s + 1].to(device, non_blocking=True)
@@ -214,4 +232,6 @@ def run_streaming_refresh(
             del is_keyframe_s
         if keyframe_indices_s is not None:
             del keyframe_indices_s
+
+    print(f"[inference] streaming_refresh: {S} frames done", flush=True)
     return session.get_all_predictions()

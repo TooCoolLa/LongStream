@@ -1,0 +1,7 @@
+[longstream] run: inference
+[longstream] device=cuda
+[longstream] model ready
+[longstream] loading sequence 00: 3840 frames
+[longstream] loaded sequence 00: (1, 3840, 3, 280, 518)
+[longstream] sequence 00: inference start (3840 frames)
+[longstream] sequence 00: inference done

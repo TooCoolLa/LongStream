@@ -35,6 +35,79 @@ def _camera_lines(frustums):
     return xs, ys, zs
 
 
+def _build_figure_from_data(
+    points,
+    colors,
+    centers,
+    frustums,
+    point_size,
+    opacity,
+    show_cameras,
+):
+    if len(points) == 0:
+        return _empty_figure("No valid points for the current selection")
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter3d(
+            x=points[:, 0],
+            y=points[:, 1],
+            z=points[:, 2],
+            mode="markers",
+            marker=dict(
+                size=float(point_size),
+                color=[f"rgb({r},{g},{b})" for r, g, b in colors],
+                opacity=float(opacity),
+            ),
+            hoverinfo="skip",
+            name="points",
+        )
+    )
+
+    if show_cameras and len(centers) > 0:
+        fig.add_trace(
+            go.Scatter3d(
+                x=centers[:, 0],
+                y=centers[:, 1],
+                z=centers[:, 2],
+                mode="lines",
+                line=dict(color="#16a34a", width=2),
+                name="trajectory",
+                hoverinfo="skip",
+            )
+        )
+        xs, ys, zs = _camera_lines(frustums)
+        fig.add_trace(
+            go.Scatter3d(
+                x=xs,
+                y=ys,
+                z=zs,
+                mode="lines",
+                line=dict(color="#22c55e", width=1.5),
+                name="cameras",
+                hoverinfo="skip",
+            )
+        )
+
+    fig.update_layout(
+        template="plotly_white",
+        margin=dict(l=0, r=0, t=40, b=0),
+        scene=dict(
+            aspectmode="data",
+            xaxis_title="x_right",
+            yaxis_title="z_forward",
+            zaxis_title="y_up",
+            bgcolor="#f8fafc",
+            camera=dict(
+                up=dict(x=0.0, y=0.0, z=1.0),
+                eye=dict(x=-1.0, y=-1.8, z=0.9),
+            ),
+        ),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.0),
+    )
+    return fig
+
+
 def build_interactive_figure(
     session_dir: str,
     branch: str,
@@ -57,26 +130,9 @@ def build_interactive_figure(
         max_points=preview_max_points,
         seed=frame_index,
     )
-    if len(points) == 0:
-        return _empty_figure("No valid points for the current selection")
 
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter3d(
-            x=points[:, 0],
-            y=points[:, 1],
-            z=points[:, 2],
-            mode="markers",
-            marker=dict(
-                size=float(point_size),
-                color=[f"rgb({r},{g},{b})" for r, g, b in colors],
-                opacity=float(opacity),
-            ),
-            hoverinfo="skip",
-            name="points",
-        )
-    )
-
+    centers = np.empty((0, 3))
+    frustums = []
     if show_cameras:
         centers, frustums, _ = camera_geometry(
             session_dir=session_dir,
@@ -85,50 +141,59 @@ def build_interactive_figure(
             camera_scale_ratio=camera_scale,
             points_hint=points,
         )
-        if len(centers) > 0:
-            fig.add_trace(
-                go.Scatter3d(
-                    x=centers[:, 0],
-                    y=centers[:, 1],
-                    z=centers[:, 2],
-                    mode="lines",
-                    line=dict(color="#16a34a", width=2),
-                    name="trajectory",
-                    hoverinfo="skip",
-                )
-            )
-            xs, ys, zs = _camera_lines(frustums)
-            fig.add_trace(
-                go.Scatter3d(
-                    x=xs,
-                    y=ys,
-                    z=zs,
-                    mode="lines",
-                    line=dict(color="#22c55e", width=1.5),
-                    name="cameras",
-                    hoverinfo="skip",
-                )
-            )
 
-    fig.update_layout(
-        template="plotly_white",
-        margin=dict(l=0, r=0, t=40, b=0),
-        scene=dict(
-            aspectmode="data",
-            xaxis_title="x_right",
-            yaxis_title="z_forward",
-            zaxis_title="y_up",
-            bgcolor="#f8fafc",
-            camera=dict(
-                up=dict(x=0.0, y=0.0, z=1.0),
-                eye=dict(x=-1.0, y=-1.8, z=0.9),
-            ),
-        ),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.0),
+    return _build_figure_from_data(
+        points, colors, centers, frustums, point_size, opacity, show_cameras
     )
-    return fig
+
+
+def build_interactive_figure_from_runpy(
+    session: dict,
+    branch: str,
+    display_mode: str,
+    frame_index: int,
+    point_size: float,
+    opacity: float,
+    preview_max_points: int,
+    show_cameras: bool,
+    camera_scale: float,
+    mask_sky: bool,
+):
+    from .runpy_loader import camera_geometry_from_runpy, collect_points_from_runpy
+
+    points, colors, _ = collect_points_from_runpy(
+        session=session,
+        branch=branch,
+        display_mode=display_mode,
+        frame_index=frame_index,
+        mask_sky=mask_sky,
+        max_points=preview_max_points,
+        seed=frame_index,
+    )
+
+    centers = np.empty((0, 3))
+    frustums = []
+    if show_cameras:
+        centers, frustums, _ = camera_geometry_from_runpy(
+            session=session,
+            display_mode=display_mode,
+            frame_index=frame_index,
+            camera_scale_ratio=camera_scale,
+            points_hint=points,
+        )
+
+    return _build_figure_from_data(
+        points, colors, centers, frustums, point_size, opacity, show_cameras
+    )
 
 
 def build_frame_outputs(session_dir: str, frame_index: int):
     rgb, depth, label = load_frame_previews(session_dir, frame_index)
+    return rgb, depth, label
+
+
+def build_frame_outputs_from_runpy(session: dict, frame_index: int):
+    from .runpy_loader import load_frame_previews_from_runpy
+
+    rgb, depth, label = load_frame_previews_from_runpy(session, frame_index)
     return rgb, depth, label

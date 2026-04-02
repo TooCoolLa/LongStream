@@ -1,0 +1,1 @@
+python -u run.py  --img-path data/ --seq-list 00 --checkpoint "checkpoints/50_longstream.pt" --streaming-mode causal --window-size 48 --keyframe-stride 4 --refresh 8 2>&1 | tee infer.log

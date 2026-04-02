@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import torch
 from PIL import Image
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from longstream.core.model import LongStreamModel
 from longstream.data.dataloader import LongStreamDataLoader
@@ -19,6 +20,9 @@ from longstream.utils.sky_mask import compute_sky_mask
 from longstream.io.save_points import save_pointcloud
 from longstream.io.save_poses_txt import save_w2c_txt, save_intri_txt, save_rel_pose_txt
 from longstream.io.save_images import save_image_sequence, save_video
+
+
+SAVE_WORKERS = int(os.getenv("LONGSTREAM_SAVE_WORKERS", "8"))
 
 
 def _to_uint8_rgb(images):
@@ -302,8 +306,7 @@ def run_inference_cfg(cfg: dict):
                 color_dir = os.path.join(seq_dir, "depth", "dpt_plasma")
                 _ensure_dir(color_dir)
 
-                color_frames = []
-                for i in range(S):
+                def _save_depth_frame(i):
                     d = depth[i]
                     if sky_masks is not None and sky_masks[i] is not None:
                         d = _apply_sky_mask(d, sky_masks[i])
@@ -312,7 +315,15 @@ def run_inference_cfg(cfg: dict):
                     Image.fromarray(colored).save(
                         os.path.join(color_dir, f"frame_{i:06d}.png")
                     )
-                    color_frames.append(colored)
+                    return colored
+
+                color_frames = [None] * S
+                with ThreadPoolExecutor(max_workers=SAVE_WORKERS) as pool:
+                    futures = {pool.submit(_save_depth_frame, i): i for i in range(S)}
+                    for future in as_completed(futures):
+                        idx = futures[future]
+                        color_frames[idx] = future.result()
+
                 if save_videos:
                     save_video(
                         os.path.join(seq_dir, "depth", "dpt_plasma.mp4"),
@@ -341,9 +352,8 @@ def run_inference_cfg(cfg: dict):
                     pts_dir = os.path.join(seq_dir, "points", "point_head")
                     _ensure_dir(pts_dir)
                     pts = outputs["world_points"][0].detach().cpu().numpy()
-                    full_pts = []
-                    full_cols = []
-                    for i in range(S):
+
+                    def _save_point_head_frame(i):
                         pts_world = _camera_points_to_world(
                             pts[i], extri[i].detach().cpu().numpy()
                         )
@@ -361,9 +371,18 @@ def run_inference_cfg(cfg: dict):
                                 max_points=max_frame_pointcloud_points,
                                 seed=i,
                             )
-                        if len(pts_i):
-                            full_pts.append(pts_i)
-                            full_cols.append(cols_i)
+                        return pts_i, cols_i
+
+                    full_pts = []
+                    full_cols = []
+                    with ThreadPoolExecutor(max_workers=SAVE_WORKERS) as pool:
+                        futures = {pool.submit(_save_point_head_frame, i): i for i in range(S)}
+                        for future in as_completed(futures):
+                            pts_i, cols_i = future.result()
+                            if len(pts_i):
+                                full_pts.append(pts_i)
+                                full_cols.append(cols_i)
+
                     _save_full_pointcloud(
                         os.path.join(seq_dir, "points", "point_head_full.ply"),
                         full_pts,
@@ -392,10 +411,8 @@ def run_inference_cfg(cfg: dict):
                     intri = intri[0]
                     dpt_pts_dir = os.path.join(seq_dir, "points", "dpt_unproj")
                     _ensure_dir(dpt_pts_dir)
-                    full_pts = []
-                    full_cols = []
 
-                    for i in range(S):
+                    def _save_dpt_unproj_frame(i):
                         d = depth[i]
                         pts_cam = unproject_depth_to_points(d[None], intri[i : i + 1])[
                             0
@@ -419,9 +436,18 @@ def run_inference_cfg(cfg: dict):
                                 max_points=max_frame_pointcloud_points,
                                 seed=i,
                             )
-                        if len(pts_i):
-                            full_pts.append(pts_i)
-                            full_cols.append(cols_i)
+                        return pts_i, cols_i
+
+                    full_pts = []
+                    full_cols = []
+                    with ThreadPoolExecutor(max_workers=SAVE_WORKERS) as pool:
+                        futures = {pool.submit(_save_dpt_unproj_frame, i): i for i in range(S)}
+                        for future in as_completed(futures):
+                            pts_i, cols_i = future.result()
+                            if len(pts_i):
+                                full_pts.append(pts_i)
+                                full_cols.append(cols_i)
+
                     _save_full_pointcloud(
                         os.path.join(seq_dir, "points", "dpt_unproj_full.ply"),
                         full_pts,
